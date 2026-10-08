@@ -1,10 +1,10 @@
-﻿using NewsApi.DTOs;
+﻿using NewsApi.DTOs.Requests;
+using NewsApi.DTOs.Responses;
 
 namespace NewsApi.Services
 {
     public interface IUserService
     {
-        // Возвращает null, если пользователь с таким username уже существует
-        Task<UserDto?> RegisterAsync(RegisterUserDto dto);
+        Task<UserResponse> RegisterAsync(RegisterUserRequest request);
     }
 }

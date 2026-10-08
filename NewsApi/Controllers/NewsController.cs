@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NewsApi.DTOs;
+using NewsApi.DTOs.Requests;
 using NewsApi.Services;
+using NewsApi.Services.Facades;
 using NewsApi.Utils;
 
 namespace NewsApi.Controllers
@@ -11,107 +12,60 @@ namespace NewsApi.Controllers
     public class NewsController : ControllerBase
     {
         private readonly INewsService _newsService;
-        private readonly ICommentService _commentService;
+        private readonly INewsCommentsFacade _newsCommentsFacade;
 
-        public NewsController(INewsService newsService, ICommentService commentService)
+        public NewsController(INewsService newsService, INewsCommentsFacade newsCommentsFacade)
         {
             _newsService = newsService;
-            _commentService = commentService;
+            _newsCommentsFacade = newsCommentsFacade;
         }
 
-        // GET api/news?page=1&pageSize=10
-        // Просмотр доступен всем, в том числе незарегистрированным
         [HttpGet]
         [AllowAnonymous]
         public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
-            if (page < 1) page = 1;
-            if (pageSize < 1 || pageSize > 100) pageSize = 10;
-
             var result = await _newsService.GetAllAsync(page, pageSize);
             return Ok(result);
         }
 
-        // GET api/news/5
         [HttpGet("{id}")]
         [AllowAnonymous]
         public async Task<IActionResult> GetById(int id)
         {
             var news = await _newsService.GetByIdAsync(id);
-            if (news == null)
-                return NotFound(new { message = $"Новость с id {id} не найдена" });
-
             return Ok(news);
         }
 
-        // GET api/news/5/with-comments
-        // Новость вместе со всеми её комментариями
         [HttpGet("{id}/with-comments")]
         [AllowAnonymous]
         public async Task<IActionResult> GetWithComments(int id)
         {
-            var news = await _newsService.GetByIdAsync(id);
-            if (news == null)
-                return NotFound(new { message = $"Новость с id {id} не найдена" });
-
-            var comments = await _commentService.GetByNewsIdAsync(id);
-
-            var result = new NewsWithCommentsDto
-            {
-                News = news,
-                Comments = comments
-            };
-
+            var result = await _newsCommentsFacade.GetNewsWithCommentsAsync(id);
             return Ok(result);
         }
 
-        // POST api/news
-        // Создавать новости могут журналисты и администраторы
         [HttpPost]
         [Authorize(Roles = "admin,reporter")]
-        public async Task<IActionResult> Create([FromBody] CreateNewsDto dto)
+        public async Task<IActionResult> Create([FromBody] CreateNewsRequest request)
         {
-            var created = await _newsService.CreateAsync(dto, User.GetUserId());
+            var created = await _newsService.CreateAsync(request, User.GetUserId());
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
-        // PUT api/news/5
-        // Журналист может менять только свои новости (проверка в сервисе), админ - любые
         [HttpPut("{id}")]
         [Authorize(Roles = "admin,reporter")]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdateNewsDto dto)
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateNewsRequest request)
         {
-            try
-            {
-                var updated = await _newsService.UpdateAsync(id, dto, User.GetUserId(), User.GetUserRole());
-                if (!updated)
-                    return NotFound(new { message = $"Новость с id {id} не найдена" });
-
-                return NoContent();
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return Forbid();
-            }
+            await _newsService.UpdateAsync(id, request, User.GetUserId(), User.GetUserRole());
+            return NoContent();
         }
 
-        // DELETE api/news/5
         [HttpDelete("{id}")]
         [Authorize(Roles = "admin,reporter")]
         public async Task<IActionResult> Delete(int id)
         {
-            try
-            {
-                var deleted = await _newsService.DeleteAsync(id, User.GetUserId(), User.GetUserRole());
-                if (!deleted)
-                    return NotFound(new { message = $"Новость с id {id} не найдена" });
-
-                return NoContent();
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return Forbid();
-            }
+            await _newsService.DeleteAsync(id, User.GetUserId(), User.GetUserRole());
+            return NoContent();
         }
     }
 }

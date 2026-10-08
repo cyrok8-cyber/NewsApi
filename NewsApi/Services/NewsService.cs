@@ -1,5 +1,7 @@
-﻿using NewsApi.DTOs;
+﻿using NewsApi.DTOs.Requests;
+using NewsApi.DTOs.Responses;
 using NewsApi.Entities;
+using NewsApi.Exceptions;
 using NewsApi.Repositories;
 
 namespace NewsApi.Services
@@ -15,18 +17,22 @@ namespace NewsApi.Services
             _userRepository = userRepository;
         }
 
-        public async Task<PagedResult<NewsDto>> GetAllAsync(int page, int pageSize)
+        public async Task<PagedResponse<NewsResponse>> GetAllAsync(int page, int pageSize)
         {
+            // Нормализация параметров пагинации - бизнес-правило, поэтому живёт здесь, а не в контроллере
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 100) pageSize = 10;
+
             var news = await _repository.GetAllAsync(page, pageSize);
             var totalCount = await _repository.GetTotalCountAsync();
 
-            var items = new List<NewsDto>();
+            var items = new List<NewsResponse>();
             foreach (var item in news)
             {
-                items.Add(await MapToDtoAsync(item));
+                items.Add(await MapToResponseAsync(item));
             }
 
-            return new PagedResult<NewsDto>
+            return new PagedResponse<NewsResponse>
             {
                 Items = items,
                 TotalCount = totalCount,
@@ -35,81 +41,85 @@ namespace NewsApi.Services
             };
         }
 
-        public async Task<NewsDto?> GetByIdAsync(int id)
+        public async Task<NewsResponse> GetByIdAsync(int id)
         {
             var news = await _repository.GetByIdAsync(id);
-            return news == null ? null : await MapToDtoAsync(news);
+            if (news == null)
+                throw new NotFoundException($"Новость с id {id} не найдена");
+
+            return await MapToResponseAsync(news);
         }
 
-        public async Task<NewsDto> CreateAsync(CreateNewsDto dto, int userId)
+        public async Task<NewsResponse> CreateAsync(CreateNewsRequest request, int userId)
         {
             var news = new News
             {
-                Title = dto.Title,
-                Text = dto.Text,
+                Title = request.Title,
+                Text = request.Text,
                 CreatedAt = DateTime.UtcNow,
                 InsertedBy = userId
             };
 
             var created = await _repository.CreateAsync(news);
-            return await MapToDtoAsync(created);
+            return await MapToResponseAsync(created);
         }
 
-        public async Task<bool> UpdateAsync(int id, UpdateNewsDto dto, int userId, string userRole)
+        public async Task UpdateAsync(int id, UpdateNewsRequest request, int userId, string userRole)
         {
             var existing = await _repository.GetByIdAsync(id);
-            if (existing == null) return false;
+            if (existing == null)
+                throw new NotFoundException($"Новость с id {id} не найдена");
 
-            // Проверка прав: admin может всё, reporter - только свои новости
+            // admin может всё, reporter - только свои новости
             if (userRole != "admin" && existing.InsertedBy != userId)
                 throw new UnauthorizedAccessException("Нет прав на редактирование этой новости");
 
-            existing.Title = dto.Title;
-            existing.Text = dto.Text;
+            existing.Title = request.Title;
+            existing.Text = request.Text;
             existing.UpdatedBy = userId;
 
-            return await _repository.UpdateAsync(existing);
+            await _repository.UpdateAsync(existing);
         }
 
-        public async Task<bool> DeleteAsync(int id, int userId, string userRole)
+        public async Task DeleteAsync(int id, int userId, string userRole)
         {
             var existing = await _repository.GetByIdAsync(id);
-            if (existing == null) return false;
+            if (existing == null)
+                throw new NotFoundException($"Новость с id {id} не найдена");
 
             if (userRole != "admin" && existing.InsertedBy != userId)
                 throw new UnauthorizedAccessException("Нет прав на удаление этой новости");
 
-            return await _repository.DeleteAsync(id);
+            await _repository.DeleteAsync(id);
         }
 
-        // Превращаем сущность News в NewsDto, подставляя короткую информацию об авторах
-        private async Task<NewsDto> MapToDtoAsync(News news)
+        private async Task<NewsResponse> MapToResponseAsync(News news)
         {
             var insertedByUser = await _userRepository.GetByIdAsync(news.InsertedBy);
 
-            UserShortDto? updatedByUser = null;
+            UserShortResponse? updatedByUser = null;
             if (news.UpdatedBy.HasValue)
             {
                 var updatedUser = await _userRepository.GetByIdAsync(news.UpdatedBy.Value);
                 if (updatedUser != null)
-                    updatedByUser = MapToUserShortDto(updatedUser);
+                    updatedByUser = MapToUserShort(updatedUser);
             }
 
-            return new NewsDto
+            return new NewsResponse
             {
                 Id = news.Id,
                 Title = news.Title,
                 Text = news.Text,
                 CreatedAt = news.CreatedAt,
                 EditedAt = news.EditedAt,
-                InsertedBy = insertedByUser != null ? MapToUserShortDto(insertedByUser) : null!,
+                InsertedBy = insertedByUser != null ? MapToUserShort(insertedByUser) : null!,
                 UpdatedBy = updatedByUser
             };
         }
 
-        private static UserShortDto MapToUserShortDto(Entities.User user)
+        private static UserShortResponse MapToUserShort(Entities.User user)
         {
-            return new UserShortDto
+            return new UserShortResponse
             {
                 Id = user.Id,
                 Surname = user.Surname,

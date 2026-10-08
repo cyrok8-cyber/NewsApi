@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using NewsApi.DTOs;
+using NewsApi.DTOs.Requests;
 using NewsApi.Services;
 
 namespace NewsApi.Controllers
@@ -15,15 +15,10 @@ namespace NewsApi.Controllers
             _userService = userService;
         }
 
-        // POST api/auth/register
-        // Регистрация нового пользователя (доступна без авторизации)
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterUserDto dto)
+        public async Task<IActionResult> Register([FromBody] RegisterUserRequest request)
         {
-            var created = await _userService.RegisterAsync(dto);
-            if (created == null)
-                return Conflict(new { message = $"Пользователь с логином '{dto.Username}' уже существует" });
-
+            var created = await _userService.RegisterAsync(request);
             return StatusCode(StatusCodes.Status201Created, created);
         }
     }

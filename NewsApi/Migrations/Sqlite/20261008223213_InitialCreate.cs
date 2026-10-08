@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace NewsApi.Migrations
+namespace NewsApi.Migrations.Sqlite
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration

@@ -1,5 +1,7 @@
-﻿using NewsApi.DTOs;
+﻿using NewsApi.DTOs.Requests;
+using NewsApi.DTOs.Responses;
 using NewsApi.Entities;
+using NewsApi.Exceptions;
 using NewsApi.Repositories;
 using NewsApi.Utils;
 
@@ -14,27 +16,26 @@ namespace NewsApi.Services
             _repository = repository;
         }
 
-        public async Task<UserDto?> RegisterAsync(RegisterUserDto dto)
+        public async Task<UserResponse> RegisterAsync(RegisterUserRequest request)
         {
-            // Логин должен быть уникальным
-            var existing = await _repository.GetByUsernameAsync(dto.Username);
+            var existing = await _repository.GetByUsernameAsync(request.Username);
             if (existing != null)
-                return null;
+                throw new ConflictException($"Пользователь с логином '{request.Username}' уже существует");
 
             var user = new User
             {
-                Username = dto.Username,
-                Password = PasswordHasher.Hash(dto.Password), // в базу попадает только хеш
-                Name = dto.Name,
-                Surname = dto.Surname,
-                ParentName = dto.ParentName ?? string.Empty,
-                Role = dto.Role,
+                Username = request.Username,
+                Password = PasswordHasher.Hash(request.Password),
+                Name = request.Name,
+                Surname = request.Surname,
+                ParentName = request.ParentName ?? string.Empty,
+                Role = request.Role,
                 CreatedAt = DateTime.UtcNow
             };
 
             var created = await _repository.CreateAsync(user);
 
-            return new UserDto
+            return new UserResponse
             {
                 Id = created.Id,
                 Username = created.Username,

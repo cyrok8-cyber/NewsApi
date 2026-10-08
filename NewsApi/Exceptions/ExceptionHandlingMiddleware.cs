@@ -34,6 +34,7 @@ namespace NewsApi.Exceptions
             var (statusCode, message) = exception switch
             {
                 NotFoundException => (HttpStatusCode.NotFound, exception.Message),
+                ConflictException => (HttpStatusCode.Conflict, exception.Message),
                 UnauthorizedAccessException => (HttpStatusCode.Forbidden, exception.Message),
                 ArgumentException => (HttpStatusCode.BadRequest, exception.Message),
 

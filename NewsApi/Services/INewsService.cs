@@ -1,21 +1,14 @@
-﻿using NewsApi.DTOs;
+﻿using NewsApi.DTOs.Requests;
+using NewsApi.DTOs.Responses;
 
 namespace NewsApi.Services
 {
-    public class PagedResult<T>
-    {
-        public List<T> Items { get; set; } = new();
-        public int TotalCount { get; set; }
-        public int Page { get; set; }
-        public int PageSize { get; set; }
-    }
-
     public interface INewsService
     {
-        Task<PagedResult<NewsDto>> GetAllAsync(int page, int pageSize);
-        Task<NewsDto?> GetByIdAsync(int id);
-        Task<NewsDto> CreateAsync(CreateNewsDto dto, int userId);
-        Task<bool> UpdateAsync(int id, UpdateNewsDto dto, int userId, string userRole);
-        Task<bool> DeleteAsync(int id, int userId, string userRole);
+        Task<PagedResponse<NewsResponse>> GetAllAsync(int page, int pageSize);
+        Task<NewsResponse> GetByIdAsync(int id);
+        Task<NewsResponse> CreateAsync(CreateNewsRequest request, int userId);
+        Task UpdateAsync(int id, UpdateNewsRequest request, int userId, string userRole);
+        Task DeleteAsync(int id, int userId, string userRole);
     }
 }

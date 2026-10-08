@@ -7,6 +7,7 @@ using NewsApi.Exceptions;
 using NewsApi.Repositories;
 using NewsApi.Services;
 using NewsApi.Utils;
+using NewsApi.Services.Facades;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,9 +15,22 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-// Подключаем базу данных SQLite через Entity Framework Core
-builder.Services.AddDbContext<AppDbContext>(options =>
+// Регистрируем оба провайдера базы данных - выбор между ними происходит через DatabaseProvider в конфиге
+builder.Services.AddDbContext<SqliteAppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddDbContext<PostgresAppDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("PostgresConnection"),
+        x => x.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
+
+var databaseProvider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "Sqlite";
+
+// AppDbContext - это то, чем реально пользуются репозитории. Подставляем нужную реализацию по конфигу
+builder.Services.AddScoped<AppDbContext>(sp =>
+    databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase)
+        ? sp.GetRequiredService<PostgresAppDbContext>()
+        : sp.GetRequiredService<SqliteAppDbContext>());
 
 // Репозитории
 builder.Services.AddScoped<INewsRepository, NewsRepository>();
@@ -27,6 +41,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<INewsService, NewsService>();
 builder.Services.AddScoped<ICommentService, CommentService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<INewsCommentsFacade, NewsCommentsFacade>();
 
 // Авторизация через Basic auth
 builder.Services.AddAuthentication(BasicAuthenticationHandler.SchemeName)
