@@ -11,11 +11,8 @@ using NewsApi.Services.Facades;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
 
-// Регистрируем оба провайдера базы данных - выбор между ними происходит через DatabaseProvider в конфиге
 builder.Services.AddDbContext<SqliteAppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -26,7 +23,6 @@ builder.Services.AddDbContext<PostgresAppDbContext>(options =>
 
 var databaseProvider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "Sqlite";
 
-// AppDbContext - это то, чем реально пользуются репозитории. Подставляем нужную реализацию по конфигу
 builder.Services.AddScoped<AppDbContext>(sp =>
     databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase)
         ? sp.GetRequiredService<PostgresAppDbContext>()
@@ -36,6 +32,8 @@ builder.Services.AddScoped<AppDbContext>(sp =>
 builder.Services.AddScoped<INewsRepository, NewsRepository>();
 builder.Services.AddScoped<ICommentRepository, CommentRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+builder.Services.AddScoped<IBannedWordRepository, BannedWordRepository>();
 
 // Сервисы
 builder.Services.AddScoped<INewsService, NewsService>();
@@ -43,22 +41,32 @@ builder.Services.AddScoped<ICommentService, CommentService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<INewsCommentsFacade, NewsCommentsFacade>();
 
-// Авторизация через Basic auth
+// Session — хранение данных пользователя после успешной Basic Auth проверки
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
+// Авторизация: Basic Authentication
 builder.Services.AddAuthentication(BasicAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, BasicAuthenticationHandler>(BasicAuthenticationHandler.SchemeName, null);
 builder.Services.AddAuthorization();
 
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// Swagger с кнопкой Authorize для ввода логина и пароля
+// Swagger с кнопкой Authorize для ввода логина/пароля (Basic)
 builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition("basic", new OpenApiSecurityScheme
     {
         Type = SecuritySchemeType.Http,
         Scheme = "basic",
-        Description = "Введите логин и пароль пользователя"
+        In = ParameterLocation.Header,
+        Name = "Authorization",
+        Description = "Введите логин и пароль (Basic Authentication)"
     });
 
     options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
@@ -69,10 +77,8 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// Глобальная обработка ошибок - должна идти первой, чтобы ловить исключения из всего конвейера
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-// Применяем миграции и наполняем базу тестовыми данными при первом запуске
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -86,8 +92,6 @@ using (var scope = app.Services.CreateScope())
             var sqlScript = File.ReadAllText(sqlPath);
             db.Database.ExecuteSqlRaw(sqlScript);
 
-            // В data.sql пароли записаны открытым текстом для наглядности,
-            // сразу после загрузки превращаем их в хеши
             foreach (var user in db.Users.ToList())
             {
                 user.Password = PasswordHasher.Hash(user.Password);
@@ -97,7 +101,6 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -107,10 +110,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Порядок важен: сначала выясняем, кто пришёл, потом решаем, что ему можно
+app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
 app.Run();
+public partial class Program { }

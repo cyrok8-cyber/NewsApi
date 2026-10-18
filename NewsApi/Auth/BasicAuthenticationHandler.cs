@@ -9,7 +9,6 @@ using NewsApi.Utils;
 
 namespace NewsApi.Auth
 {
-    // Проверяет заголовок Authorization: Basic ... в каждом запросе
     public class BasicAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
     {
         public const string SchemeName = "Basic";
@@ -20,64 +19,107 @@ namespace NewsApi.Auth
             IOptionsMonitor<AuthenticationSchemeOptions> options,
             ILoggerFactory logger,
             UrlEncoder encoder,
-            IUserRepository userRepository) : base(options, logger, encoder)
+            IUserRepository userRepository)
+            : base(options, logger, encoder)
         {
             _userRepository = userRepository;
         }
 
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            // Заголовка нет - значит, пришёл незарегистрированный пользователь (гость)
-            if (!Request.Headers.TryGetValue("Authorization", out var headerValue))
-                return AuthenticateResult.NoResult();
+            var cachedUserId = Context.Session.GetInt32("UserId");
+            var cachedUsername = Context.Session.GetString("Username");
+            var cachedRole = Context.Session.GetString("Role");
 
-            if (!AuthenticationHeaderValue.TryParse(headerValue, out var header) ||
-                !SchemeName.Equals(header.Scheme, StringComparison.OrdinalIgnoreCase) ||
-                string.IsNullOrEmpty(header.Parameter))
+            if (cachedUserId.HasValue && cachedUsername is not null && cachedRole is not null)
             {
-                return AuthenticateResult.NoResult();
+                var cachedClaims = new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, cachedUserId.Value.ToString()),
+                    new Claim(ClaimTypes.Name, cachedUsername),
+                    new Claim(ClaimTypes.Role, cachedRole)
+                };
+
+                var cachedIdentity = new ClaimsIdentity(cachedClaims, Scheme.Name);
+                var cachedPrincipal = new ClaimsPrincipal(cachedIdentity);
+                var cachedTicket = new AuthenticationTicket(cachedPrincipal, Scheme.Name);
+
+                return AuthenticateResult.Success(cachedTicket);
             }
 
-            // Раскодируем Base64 и делим строку "логин:пароль" по первому двоеточию
-            // (в самом пароле двоеточие может встречаться)
-            string login, password;
+            if (!Request.Headers.ContainsKey("Authorization"))
+                return AuthenticateResult.Fail("Отсутствует заголовок Authorization");
+
+            string username, password;
             try
             {
-                var credentials = Encoding.UTF8.GetString(Convert.FromBase64String(header.Parameter));
-                var separatorIndex = credentials.IndexOf(':');
-                if (separatorIndex < 0)
-                    return AuthenticateResult.Fail("Неверный формат учётных данных");
+                var header = AuthenticationHeaderValue.Parse(Request.Headers["Authorization"].ToString());
+                if (!"Basic".Equals(header.Scheme, StringComparison.OrdinalIgnoreCase) || header.Parameter is null)
+                    return AuthenticateResult.Fail("Неверная схема авторизации");
 
-                login = credentials[..separatorIndex];
-                password = credentials[(separatorIndex + 1)..];
+                var bytes = Convert.FromBase64String(header.Parameter);
+                var decoded = Encoding.UTF8.GetString(bytes);
+                var parts = decoded.Split(':', 2);
+                if (parts.Length != 2)
+                    return AuthenticateResult.Fail("Неверный формат заголовка Authorization");
+
+                username = parts[0];
+                password = parts[1];
             }
-            catch (FormatException)
+            catch
             {
-                return AuthenticateResult.Fail("Неверный формат учётных данных");
+                return AuthenticateResult.Fail("Не удалось разобрать заголовок Authorization");
             }
 
-            // Ищем пользователя и сверяем пароль с хешем из базы
-            var user = await _userRepository.GetByUsernameAsync(login);
-            if (user == null || !PasswordHasher.Verify(password, user.Password))
+            var user = await _userRepository.GetByUsernameAsync(username);
+            if (user is null)
                 return AuthenticateResult.Fail("Неверный логин или пароль");
 
-            // Сохраняем в "удостоверении" id, логин и роль - дальше они доступны через User в контроллерах
+            if (user.BlockedUntil.HasValue && user.BlockedUntil.Value > DateTime.UtcNow)
+                return AuthenticateResult.Fail($"Пользователь заблокирован до {user.BlockedUntil.Value:O}");
+
+            var passwordOk = PasswordHasher.Verify(password, user.Password);
+
+            if (!passwordOk)
+            {
+                user.FailedLoginAttempts++;
+                if (user.FailedLoginAttempts >= BlockingPolicy.MaxFailedLoginAttempts)
+                {
+                    user.BlockedUntil = DateTime.UtcNow.Add(BlockingPolicy.LoginBlockDuration);
+                    user.FailedLoginAttempts = 0;
+                }
+                await _userRepository.UpdateAsync(user);
+                return AuthenticateResult.Fail("Неверный логин или пароль");
+            }
+
+            if (user.FailedLoginAttempts != 0 || user.BlockedUntil.HasValue)
+            {
+                user.FailedLoginAttempts = 0;
+                user.BlockedUntil = null;
+                await _userRepository.UpdateAsync(user);
+            }
+
+            Context.Session.SetInt32("UserId", user.Id);
+            Context.Session.SetString("Username", user.Username);
+            Context.Session.SetString("Role", user.Role.Name);
+
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role)
+                new Claim(ClaimTypes.Role, user.Role.Name)
             };
+
             var identity = new ClaimsIdentity(claims, Scheme.Name);
-            var ticket = new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name);
+            var principal = new ClaimsPrincipal(identity);
+            var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
             return AuthenticateResult.Success(ticket);
         }
 
-        // При ответе 401 сообщаем клиенту, что ждём именно Basic (так требует стандарт HTTP)
         protected override Task HandleChallengeAsync(AuthenticationProperties properties)
         {
-            Response.Headers.WWWAuthenticate = "Basic realm=\"NewsApi\", charset=\"UTF-8\"";
+            Response.Headers["WWW-Authenticate"] = "Basic";
             return base.HandleChallengeAsync(properties);
         }
     }

@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="NewsApi.Tests/NewsApi.Tests.csproj" Id="e6382a91-6806-46b1-a805-aefcaf4ae743" />
   <Project Path="NewsApi/NewsApi.csproj" />
 </Solution>

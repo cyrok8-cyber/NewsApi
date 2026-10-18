@@ -10,16 +10,20 @@ namespace NewsApi.Services
     {
         private readonly INewsRepository _repository;
         private readonly IUserRepository _userRepository;
+        private readonly IBannedWordRepository _bannedWordRepository;
 
-        public NewsService(INewsRepository repository, IUserRepository userRepository)
+        public NewsService(
+            INewsRepository repository,
+            IUserRepository userRepository,
+            IBannedWordRepository bannedWordRepository)
         {
             _repository = repository;
             _userRepository = userRepository;
+            _bannedWordRepository = bannedWordRepository;
         }
 
         public async Task<PagedResponse<NewsResponse>> GetAllAsync(int page, int pageSize)
         {
-            // Нормализация параметров пагинации - бизнес-правило, поэтому живёт здесь, а не в контроллере
             if (page < 1) page = 1;
             if (pageSize < 1 || pageSize > 100) pageSize = 10;
 
@@ -52,6 +56,8 @@ namespace NewsApi.Services
 
         public async Task<NewsResponse> CreateAsync(CreateNewsRequest request, int userId)
         {
+            await EnsureNoBannedWordsAsync(userId, request.Title, request.Text);
+
             var news = new News
             {
                 Title = request.Title,
@@ -70,9 +76,10 @@ namespace NewsApi.Services
             if (existing == null)
                 throw new NotFoundException($"Новость с id {id} не найдена");
 
-            // admin может всё, reporter - только свои новости
             if (userRole != "admin" && existing.InsertedBy != userId)
                 throw new UnauthorizedAccessException("Нет прав на редактирование этой новости");
+
+            await EnsureNoBannedWordsAsync(userId, request.Title, request.Text);
 
             existing.Title = request.Title;
             existing.Text = request.Text;
@@ -91,6 +98,16 @@ namespace NewsApi.Services
                 throw new UnauthorizedAccessException("Нет прав на удаление этой новости");
 
             await _repository.DeleteAsync(id);
+        }
+
+        private async Task EnsureNoBannedWordsAsync(int userId, string title, string text)
+        {
+            if (await _bannedWordRepository.ContainsBannedWordAsync(title) ||
+                await _bannedWordRepository.ContainsBannedWordAsync(text))
+            {
+                await _userRepository.RegisterFailedBannedWordAttemptAsync(userId);
+                throw new BannedWordException("Текст новости содержит запрещённое слово");
+            }
         }
 
         private async Task<NewsResponse> MapToResponseAsync(News news)

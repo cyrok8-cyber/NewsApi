@@ -36,10 +36,10 @@ namespace NewsApi.Exceptions
                 NotFoundException => (HttpStatusCode.NotFound, exception.Message),
                 ConflictException => (HttpStatusCode.Conflict, exception.Message),
                 UnauthorizedAccessException => (HttpStatusCode.Forbidden, exception.Message),
+                AuthenticationFailedException => (HttpStatusCode.Unauthorized, exception.Message),
+                BannedWordException => (HttpStatusCode.BadRequest, exception.Message),
                 ArgumentException => (HttpStatusCode.BadRequest, exception.Message),
 
-                // Любое непредвиденное исключение - не раскрываем детали клиенту,
-                // но полностью логируем на сервере для последующей диагностики
                 _ => (HttpStatusCode.InternalServerError, "Внутренняя ошибка сервера")
             };
 

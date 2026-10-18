@@ -10,13 +10,19 @@ namespace NewsApi.Services
     {
         private readonly ICommentRepository _repository;
         private readonly IUserRepository _userRepository;
-        private readonly INewsRepository _newsRepository; // напрямую репозиторий, не NewsService
+        private readonly INewsRepository _newsRepository;
+        private readonly IBannedWordRepository _bannedWordRepository;
 
-        public CommentService(ICommentRepository repository, IUserRepository userRepository, INewsRepository newsRepository)
+        public CommentService(
+            ICommentRepository repository,
+            IUserRepository userRepository,
+            INewsRepository newsRepository,
+            IBannedWordRepository bannedWordRepository)
         {
             _repository = repository;
             _userRepository = userRepository;
             _newsRepository = newsRepository;
+            _bannedWordRepository = bannedWordRepository;
         }
 
         public async Task<List<CommentResponse>> GetByNewsIdAsync(int newsId)
@@ -33,10 +39,11 @@ namespace NewsApi.Services
 
         public async Task<CommentResponse> CreateAsync(int newsId, CreateCommentRequest request, int userId)
         {
-            // Нельзя оставить комментарий к новости, которой не существует
             var news = await _newsRepository.GetByIdAsync(newsId);
             if (news == null)
                 throw new NotFoundException($"Новость с id {newsId} не найдена");
+
+            await EnsureNoBannedWordsAsync(userId, request.Text);
 
             var comment = new Comment
             {
@@ -59,6 +66,8 @@ namespace NewsApi.Services
             if (userRole != "admin" && existing.InsertedBy != userId)
                 throw new UnauthorizedAccessException("Нет прав на редактирование этого комментария");
 
+            await EnsureNoBannedWordsAsync(userId, request.Text);
+
             existing.Text = request.Text;
             await _repository.UpdateAsync(existing);
         }
@@ -73,6 +82,15 @@ namespace NewsApi.Services
                 throw new UnauthorizedAccessException("Нет прав на удаление этого комментария");
 
             await _repository.DeleteAsync(id);
+        }
+
+        private async Task EnsureNoBannedWordsAsync(int userId, string text)
+        {
+            if (await _bannedWordRepository.ContainsBannedWordAsync(text))
+            {
+                await _userRepository.RegisterFailedBannedWordAttemptAsync(userId);
+                throw new BannedWordException("Текст комментария содержит запрещённое слово");
+            }
         }
 
         private async Task<CommentResponse> MapToResponseAsync(Comment comment)

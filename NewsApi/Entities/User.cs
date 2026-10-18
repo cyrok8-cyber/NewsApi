@@ -2,7 +2,6 @@
 
 namespace NewsApi.Entities
 {
-    // Пользователь системы: администратор, журналист или подписчик
     public class User
     {
         public int Id { get; set; }
@@ -20,13 +19,17 @@ namespace NewsApi.Entities
         public string Surname { get; set; } = string.Empty;
 
         [MaxLength(20)]
-        public string ParentName { get; set; } = string.Empty; // отчество
+        public string ParentName { get; set; } = string.Empty;
 
-        // Роль нужна отдельно для проверки прав доступа (admin/reporter/subscriber)
-        [MaxLength(20)]
-        public string Role { get; set; } = string.Empty;
+        public int RoleId { get; set; }
+        public Role Role { get; set; } = null!;
 
         public DateTime CreatedAt { get; set; }
         public DateTime? EditedAt { get; set; }
+
+        // Блокировка
+        public int FailedLoginAttempts { get; set; } = 0;
+        public int FailedBannedWordAttempts { get; set; } = 0;
+        public DateTime? BlockedUntil { get; set; }
     }
 }

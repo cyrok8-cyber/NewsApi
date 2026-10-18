@@ -1,6 +1,5 @@
 ﻿namespace NewsApi.DTOs.Responses
 {
-    // Что отдаём наружу о пользователе после регистрации. Пароля здесь нет намеренно
     public class UserResponse
     {
         public int Id { get; set; }
@@ -11,5 +10,7 @@
         public string Role { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public DateTime? EditedAt { get; set; }
+        public bool IsBlocked { get; set; }
+        public DateTime? BlockedUntil { get; set; }
     }
 }

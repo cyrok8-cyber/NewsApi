@@ -7,5 +7,7 @@ namespace NewsApi.Repositories
         Task<User?> GetByUsernameAsync(string username);
         Task<User?> GetByIdAsync(int id);
         Task<User> CreateAsync(User user);
+        Task UpdateAsync(User user);
+        Task RegisterFailedBannedWordAttemptAsync(int userId);
     }
 }
