@@ -21,12 +21,15 @@ builder.Services.AddDbContext<PostgresAppDbContext>(options =>
         builder.Configuration.GetConnectionString("PostgresConnection"),
         x => x.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
 
-var databaseProvider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "Sqlite";
-
 builder.Services.AddScoped<AppDbContext>(sp =>
-    databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase)
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var databaseProvider = config.GetValue<string>("DatabaseProvider") ?? "Sqlite";
+
+    return databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase)
         ? sp.GetRequiredService<PostgresAppDbContext>()
-        : sp.GetRequiredService<SqliteAppDbContext>());
+        : sp.GetRequiredService<SqliteAppDbContext>();
+});
 
 // Репозитории
 builder.Services.AddScoped<INewsRepository, NewsRepository>();
