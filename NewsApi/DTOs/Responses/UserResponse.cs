@@ -8,6 +8,9 @@
         public string Surname { get; set; } = string.Empty;
         public string ParentName { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
+
+        // Редакция журналиста (null - не состоит в редакции)
+        public EditorialOfficeShortResponse? EditorialOffice { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? EditedAt { get; set; }
         public bool IsBlocked { get; set; }

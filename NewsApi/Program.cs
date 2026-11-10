@@ -8,6 +8,7 @@ using NewsApi.Repositories;
 using NewsApi.Services;
 using NewsApi.Utils;
 using NewsApi.Services.Facades;
+using NewsApi.Services.Censorship;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,11 +38,24 @@ builder.Services.AddScoped<ICommentRepository, CommentRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IBannedWordRepository, BannedWordRepository>();
+builder.Services.AddScoped<IEditorialOfficeRepository, EditorialOfficeRepository>();
+builder.Services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
 
 // Сервисы
 builder.Services.AddScoped<INewsService, NewsService>();
 builder.Services.AddScoped<ICommentService, CommentService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IEditorialOfficeService, EditorialOfficeService>();
+builder.Services.AddScoped<IChatService, ChatService>();
+
+// Цензура чата - цепочка обработчиков (Chain of Responsibility).
+// Обработчики хранят ссылку на следующий, поэтому создаются заново на каждый запрос (Scoped)
+builder.Services.AddScoped<EmptyMessageHandler>();
+builder.Services.AddScoped<MaxLengthHandler>();
+builder.Services.AddScoped<LinkFilterHandler>();
+builder.Services.AddScoped<BannedWordsHandler>();
+builder.Services.AddScoped<CapsLockHandler>();
+builder.Services.AddScoped<IChatCensorshipChain, ChatCensorshipChain>();
 builder.Services.AddScoped<INewsCommentsFacade, NewsCommentsFacade>();
 
 // Session — хранение данных пользователя после успешной Basic Auth проверки

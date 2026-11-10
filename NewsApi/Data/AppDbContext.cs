@@ -14,6 +14,8 @@ namespace NewsApi.Data
         public DbSet<Comment> Comments { get; set; } = null!;
         public DbSet<Role> Roles { get; set; } = null!;
         public DbSet<BannedWord> BannedWords { get; set; } = null!;
+        public DbSet<EditorialOffice> EditorialOffices { get; set; } = null!;
+        public DbSet<ChatMessage> ChatMessages { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -33,7 +35,41 @@ namespace NewsApi.Data
                 new Role { Id = 3, Name = "subscriber" }
             );
 
-            
+            // Редакции: наименование уникально
+            modelBuilder.Entity<EditorialOffice>().HasIndex(o => o.Name).IsUnique();
+
+            // Журналист -> редакция (необязательная связь).
+            // При удалении редакции её журналисты становятся одиночками
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.EditorialOffice)
+                .WithMany(o => o.Members)
+                .HasForeignKey(u => u.EditorialOfficeId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Новость -> редакция, от имени которой она опубликована (необязательная связь).
+            // При удалении редакции новости остаются, но подписываются только именем автора
+            modelBuilder.Entity<News>()
+                .HasOne(n => n.EditorialOffice)
+                .WithMany()
+                .HasForeignKey(n => n.EditorialOfficeId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Чат редакции: при удалении редакции удаляется и её переписка
+            modelBuilder.Entity<ChatMessage>()
+                .HasOne(m => m.EditorialOffice)
+                .WithMany()
+                .HasForeignKey(m => m.EditorialOfficeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ChatMessage>()
+                .HasOne(m => m.Author)
+                .WithMany()
+                .HasForeignKey(m => m.AuthorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Сообщения всегда выбираются по редакции и сортируются по времени
+            modelBuilder.Entity<ChatMessage>()
+                .HasIndex(m => new { m.EditorialOfficeId, m.CreatedAt });
         }
     }
 }

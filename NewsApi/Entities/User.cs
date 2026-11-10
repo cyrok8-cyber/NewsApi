@@ -24,6 +24,10 @@ namespace NewsApi.Entities
         public int RoleId { get; set; }
         public Role Role { get; set; } = null!;
 
+        // Редакция, в которой состоит журналист. null - журналист-одиночка (без редакции)
+        public int? EditorialOfficeId { get; set; }
+        public EditorialOffice? EditorialOffice { get; set; }
+
         public DateTime CreatedAt { get; set; }
         public DateTime? EditedAt { get; set; }
 

@@ -39,6 +39,40 @@ namespace NewsApi.Migrations.Postgres
                     b.ToTable("BannedWords");
                 });
 
+            modelBuilder.Entity("NewsApi.Entities.ChatMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AuthorId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EditorialOfficeId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("WasCensored")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorId");
+
+                    b.HasIndex("EditorialOfficeId", "CreatedAt");
+
+                    b.ToTable("ChatMessages");
+                });
+
             modelBuilder.Entity("NewsApi.Entities.Comment", b =>
                 {
                     b.Property<int>("Id")
@@ -69,6 +103,34 @@ namespace NewsApi.Migrations.Postgres
                     b.ToTable("Comments");
                 });
 
+            modelBuilder.Entity("NewsApi.Entities.EditorialOffice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("EditorialOffices");
+                });
+
             modelBuilder.Entity("NewsApi.Entities.News", b =>
                 {
                     b.Property<int>("Id")
@@ -82,6 +144,9 @@ namespace NewsApi.Migrations.Postgres
 
                     b.Property<DateTime?>("EditedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("EditorialOfficeId")
+                        .HasColumnType("integer");
 
                     b.Property<int>("InsertedBy")
                         .HasColumnType("integer");
@@ -100,6 +165,8 @@ namespace NewsApi.Migrations.Postgres
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EditorialOfficeId");
 
                     b.ToTable("News");
                 });
@@ -158,6 +225,9 @@ namespace NewsApi.Migrations.Postgres
                     b.Property<DateTime?>("EditedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("EditorialOfficeId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("FailedBannedWordAttempts")
                         .HasColumnType("integer");
 
@@ -194,20 +264,63 @@ namespace NewsApi.Migrations.Postgres
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EditorialOfficeId");
+
                     b.HasIndex("RoleId");
 
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("NewsApi.Entities.ChatMessage", b =>
+                {
+                    b.HasOne("NewsApi.Entities.User", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NewsApi.Entities.EditorialOffice", "EditorialOffice")
+                        .WithMany()
+                        .HasForeignKey("EditorialOfficeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Author");
+
+                    b.Navigation("EditorialOffice");
+                });
+
+            modelBuilder.Entity("NewsApi.Entities.News", b =>
+                {
+                    b.HasOne("NewsApi.Entities.EditorialOffice", "EditorialOffice")
+                        .WithMany()
+                        .HasForeignKey("EditorialOfficeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("EditorialOffice");
+                });
+
             modelBuilder.Entity("NewsApi.Entities.User", b =>
                 {
+                    b.HasOne("NewsApi.Entities.EditorialOffice", "EditorialOffice")
+                        .WithMany("Members")
+                        .HasForeignKey("EditorialOfficeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("NewsApi.Entities.Role", "Role")
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("EditorialOffice");
+
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("NewsApi.Entities.EditorialOffice", b =>
+                {
+                    b.Navigation("Members");
                 });
 #pragma warning restore 612, 618
         }

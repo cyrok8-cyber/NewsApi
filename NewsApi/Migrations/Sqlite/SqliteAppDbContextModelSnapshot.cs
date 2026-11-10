@@ -32,6 +32,38 @@ namespace NewsApi.Migrations.Sqlite
                     b.ToTable("BannedWords");
                 });
 
+            modelBuilder.Entity("NewsApi.Entities.ChatMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("AuthorId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("EditorialOfficeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("WasCensored")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorId");
+
+                    b.HasIndex("EditorialOfficeId", "CreatedAt");
+
+                    b.ToTable("ChatMessages");
+                });
+
             modelBuilder.Entity("NewsApi.Entities.Comment", b =>
                 {
                     b.Property<int>("Id")
@@ -60,6 +92,32 @@ namespace NewsApi.Migrations.Sqlite
                     b.ToTable("Comments");
                 });
 
+            modelBuilder.Entity("NewsApi.Entities.EditorialOffice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("EditorialOffices");
+                });
+
             modelBuilder.Entity("NewsApi.Entities.News", b =>
                 {
                     b.Property<int>("Id")
@@ -71,6 +129,9 @@ namespace NewsApi.Migrations.Sqlite
 
                     b.Property<DateTime?>("EditedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("EditorialOfficeId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("InsertedBy")
                         .HasColumnType("INTEGER");
@@ -89,6 +150,8 @@ namespace NewsApi.Migrations.Sqlite
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EditorialOfficeId");
 
                     b.ToTable("News");
                 });
@@ -143,6 +206,9 @@ namespace NewsApi.Migrations.Sqlite
                     b.Property<DateTime?>("EditedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("EditorialOfficeId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("FailedBannedWordAttempts")
                         .HasColumnType("INTEGER");
 
@@ -179,20 +245,63 @@ namespace NewsApi.Migrations.Sqlite
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EditorialOfficeId");
+
                     b.HasIndex("RoleId");
 
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("NewsApi.Entities.ChatMessage", b =>
+                {
+                    b.HasOne("NewsApi.Entities.User", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NewsApi.Entities.EditorialOffice", "EditorialOffice")
+                        .WithMany()
+                        .HasForeignKey("EditorialOfficeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Author");
+
+                    b.Navigation("EditorialOffice");
+                });
+
+            modelBuilder.Entity("NewsApi.Entities.News", b =>
+                {
+                    b.HasOne("NewsApi.Entities.EditorialOffice", "EditorialOffice")
+                        .WithMany()
+                        .HasForeignKey("EditorialOfficeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("EditorialOffice");
+                });
+
             modelBuilder.Entity("NewsApi.Entities.User", b =>
                 {
+                    b.HasOne("NewsApi.Entities.EditorialOffice", "EditorialOffice")
+                        .WithMany("Members")
+                        .HasForeignKey("EditorialOfficeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("NewsApi.Entities.Role", "Role")
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("EditorialOffice");
+
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("NewsApi.Entities.EditorialOffice", b =>
+                {
+                    b.Navigation("Members");
                 });
 #pragma warning restore 612, 618
         }

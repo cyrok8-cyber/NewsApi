@@ -58,12 +58,16 @@ namespace NewsApi.Services
         {
             await EnsureNoBannedWordsAsync(userId, request.Title, request.Text);
 
+            // Если автор состоит в редакции - новость публикуется от её имени
+            var author = await _userRepository.GetByIdAsync(userId);
+
             var news = new News
             {
                 Title = request.Title,
                 Text = request.Text,
                 CreatedAt = DateTime.UtcNow,
-                InsertedBy = userId
+                InsertedBy = userId,
+                EditorialOfficeId = author?.EditorialOfficeId
             };
 
             var created = await _repository.CreateAsync(news);
@@ -122,16 +126,36 @@ namespace NewsApi.Services
                     updatedByUser = MapToUserShort(updatedUser);
             }
 
+            var office = news.EditorialOffice;
+
             return new NewsResponse
             {
                 Id = news.Id,
                 Title = news.Title,
                 Text = news.Text,
+                PublishedBy = BuildPublishedBy(office, insertedByUser),
+                EditorialOffice = office != null
+                    ? new EditorialOfficeShortResponse { Id = office.Id, Name = office.Name }
+                    : null,
                 CreatedAt = news.CreatedAt,
                 EditedAt = news.EditedAt,
                 InsertedBy = insertedByUser != null ? MapToUserShort(insertedByUser) : null!,
                 UpdatedBy = updatedByUser
             };
+        }
+
+        // Подпись новости: сначала наименование редакции, потом её редактор.
+        // У журналиста-одиночки - только ФИО
+        private static string BuildPublishedBy(EditorialOffice? office, Entities.User? author)
+        {
+            var authorName = author != null
+                ? string.Join(" ", new[] { author.Surname, author.Name, author.ParentName }
+                    .Where(part => !string.IsNullOrWhiteSpace(part)))
+                : "Автор неизвестен";
+
+            return office != null
+                ? $"Редакция «{office.Name}», редактор: {authorName}"
+                : authorName;
         }
 
         private static UserShortResponse MapToUserShort(Entities.User user)

@@ -18,6 +18,7 @@ namespace NewsApi.Repositories
         {
             return await _context.Users
                 .Include(u => u.Role)
+                .Include(u => u.EditorialOffice)
                 .FirstOrDefaultAsync(u => u.Username == username);
         }
 
@@ -25,6 +26,7 @@ namespace NewsApi.Repositories
         {
             return await _context.Users
                 .Include(u => u.Role)
+                .Include(u => u.EditorialOffice)
                 .FirstOrDefaultAsync(u => u.Id == id);
         }
 

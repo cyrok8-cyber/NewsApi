@@ -20,5 +20,10 @@ namespace NewsApi.Repositories
             var words = await _context.BannedWords.Select(w => w.Word).ToListAsync();
             return words.Any(w => text.Contains(w, StringComparison.OrdinalIgnoreCase));
         }
+
+        public async Task<List<string>> GetAllWordsAsync()
+        {
+            return await _context.BannedWords.Select(w => w.Word).ToListAsync();
+        }
     }
 }

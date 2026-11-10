@@ -37,6 +37,7 @@ namespace NewsApi.Services
                 ParentName = request.ParentName,
                 RoleId = role.Id,
                 Role = role,
+                CreatedAt = DateTime.UtcNow,
                 FailedLoginAttempts = 0,
                 FailedBannedWordAttempts = 0,
                 BlockedUntil = null
@@ -110,6 +111,11 @@ namespace NewsApi.Services
                 Surname = user.Surname,
                 ParentName = user.ParentName,
                 Role = user.Role.Name,
+                EditorialOffice = user.EditorialOffice != null
+                    ? new EditorialOfficeShortResponse { Id = user.EditorialOffice.Id, Name = user.EditorialOffice.Name }
+                    : null,
+                CreatedAt = user.CreatedAt,
+                EditedAt = user.EditedAt,
                 IsBlocked = user.BlockedUntil.HasValue && user.BlockedUntil.Value > DateTime.UtcNow,
                 BlockedUntil = user.BlockedUntil
             };

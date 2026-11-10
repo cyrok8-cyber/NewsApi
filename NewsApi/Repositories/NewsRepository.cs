@@ -17,6 +17,7 @@ namespace NewsApi.Repositories
         public async Task<List<News>> GetAllAsync(int page, int pageSize)
         {
             return await _context.News
+                .Include(n => n.EditorialOffice) // чтобы вывести наименование редакции
                 .OrderByDescending(n => n.CreatedAt) // сначала свежие
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -31,13 +32,20 @@ namespace NewsApi.Repositories
 
         public async Task<News?> GetByIdAsync(int id)
         {
-            return await _context.News.FindAsync(id);
+            return await _context.News
+                .Include(n => n.EditorialOffice)
+                .FirstOrDefaultAsync(n => n.Id == id);
         }
 
         public async Task<News> CreateAsync(News news)
         {
             _context.News.Add(news);
             await _context.SaveChangesAsync();
+
+            // Подгружаем редакцию, чтобы сразу вернуть её наименование в ответе
+            if (news.EditorialOfficeId.HasValue)
+                await _context.Entry(news).Reference(n => n.EditorialOffice).LoadAsync();
+
             return news;
         }
 
